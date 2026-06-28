@@ -1,0 +1,31 @@
+{
+  "test_id": "TEST-0005",
+  "description": "Lead Decline Steal transition check.",
+  "rule_ids": ["AETS-5.2"],
+  "config": {
+    "num_players": 4,
+    "num_rounds": 2,
+    "match_seed": "12345"
+  },
+  "actions": [
+    {
+      "type": "DeclineSteal",
+      "player_id": 0
+    }
+  ],
+  "assertions": {
+    "terminal": false,
+    "round_status": "IN_PROGRESS",
+    "current_player_id": 0,
+    "expected_events": [
+      "MATCH_STARTED",
+      "ROUND_STARTED",
+      "CARDS_DEALT",
+      "CARDS_DEALT",
+      "CARDS_DEALT",
+      "CARDS_DEALT",
+      "TRICK_STARTED",
+      "STEAL_DECLINED"
+    ]
+  }
+}

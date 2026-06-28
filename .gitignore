@@ -1,0 +1,28 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test caches
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local logs and replays
+replays/*.json
+replays/*.msgpack
+*.log

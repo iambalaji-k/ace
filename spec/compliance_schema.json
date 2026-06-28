@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AceEngineComplianceTestCase",
+  "description": "Schema definition for a language-agnostic conformance test case for the Ace Engine Simulator.",
+  "type": "object",
+  "properties": {
+    "test_id": {
+      "type": "string",
+      "pattern": "^TEST-\\d{4}$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "rule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "num_players": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 6
+        },
+        "num_rounds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "match_seed": {
+          "type": "string"
+        }
+      },
+      "required": ["num_players", "num_rounds", "match_seed"]
+    },
+    "preconditions": {
+      "type": "object",
+      "properties": {
+        "round_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "player_hands": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 51
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["DeclineSteal", "Steal", "PlayCard"]
+          },
+          "player_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "card": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 51
+          }
+        },
+        "required": ["type", "player_id"]
+      }
+    },
+    "assertions": {
+      "type": "object",
+      "properties": {
+        "terminal": {
+          "type": "boolean"
+        },
+        "round_status": {
+          "type": "string",
+          "enum": ["INIT", "IN_PROGRESS", "COMPLETE"]
+        },
+        "current_player_id": {
+          "type": ["integer", "null"]
+        },
+        "expected_events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "final_player_states": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "hand_size": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "is_active": {
+                "type": "boolean"
+              },
+              "consecutive_loss_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": ["hand_size", "is_active", "consecutive_loss_count"]
+          }
+        }
+      },
+      "required": ["terminal"]
+    }
+  },
+  "required": ["test_id", "description", "config", "actions", "assertions"]
+}

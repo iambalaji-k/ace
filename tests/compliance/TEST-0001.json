@@ -1,0 +1,15 @@
+{
+  "test_id": "TEST-0001",
+  "description": "PCG-XSH-RR-64/32 PRNG conformance test.",
+  "rule_ids": ["AETS-1.3"],
+  "config": {
+    "num_players": 4,
+    "num_rounds": 1,
+    "match_seed": "42"
+  },
+  "actions": [],
+  "assertions": {
+    "terminal": false,
+    "expected_prng_outputs": [3270867926, 1795671209, 1924641435]
+  }
+}
