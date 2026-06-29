@@ -122,16 +122,30 @@ def main():
             hand_s = " ".join(color_card(c) for c in my_hand)
             print(f"Your Hand: [ {hand_s} ] ({len(my_hand)} cards)")
 
-            # Describe options
+            # Describe options with explainability breakdown
             legal_actions = AceEngine.get_legal_actions(state)
-            print(f"\n{BOLD}Your Options:{RESET}")
+            player_view = get_player_view(state, 0)
+            advisor = HeuristicAgent(player_id=0, seed=match_seed)
+            evals = advisor.evaluate_legal_actions(player_view, legal_actions)
+            eval_map = {ev.action: ev for ev in evals}
+
+            print(f"\n{BOLD}Your Options & Heuristic Agent Advice:{RESET}")
             for idx, act in enumerate(legal_actions):
                 if isinstance(act, StealAction):
-                    print(f"  [{idx}] {YELLOW}Steal{RESET} from target player P{phase.steal_target if isinstance(phase, AwaitingStealDecision) else ''}")
+                    action_str = f"{YELLOW}Steal{RESET} from target player P{phase.steal_target if isinstance(phase, AwaitingStealDecision) else ''}"
                 elif isinstance(act, DeclineStealAction):
-                    print(f"  [{idx}] Decline Steal")
+                    action_str = "Decline Steal"
                 elif isinstance(act, PlayCardAction):
-                    print(f"  [{idx}] Play Card {color_card(act.card)}")
+                    action_str = f"Play Card {color_card(act.card)}"
+                else:
+                    action_str = str(act)
+                
+                print(f"  [{idx}] {action_str}")
+                if act in eval_map:
+                    ev_obj = eval_map[act]
+                    bd_parts = [f"{k}: {v:+.1f}" for k, v in ev_obj.breakdown.items()]
+                    bd_str = ", ".join(bd_parts) if bd_parts else "No rules active"
+                    print(f"      AI Score: {BOLD}{ev_obj.total_score:+.1f}{RESET} ( {bd_str} )")
 
             # Loop until valid input
             while True:
