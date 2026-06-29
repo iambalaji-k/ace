@@ -48,3 +48,11 @@ def test_heuristic_agent_tie_breaking() -> None:
 
     action = agent.select_action(state, legal_actions)
     assert action in legal_actions
+
+
+def test_heuristic_agent_v2_creation() -> None:
+    from engine.heuristic_agent_v2 import HeuristicAgentV2
+    agent = HeuristicAgentV2(player_id=1, seed=123)
+    assert agent.player_id == 1
+    assert "H102" in agent.weights
+    assert agent.weights["H114"] == 9999.0

@@ -146,6 +146,9 @@ class CardTracker:
                     if get_suit(play.card) != lead_suit:
                         self.is_void[play.player_id][lead_suit] = True
 
+        # Re-apply viewer hand locations at the end to ensure they are marked "self", not "played"
+        self.record_own_hand(viewer_id, round_state.players[viewer_id].hand)
+
     def get_suit_counts(self, viewer_id: int) -> Tuple[List[int], List[int], List[int], List[int]]:
         """Compute C_own, C_discard, C_known, and U for all suits."""
         c_own = [0] * 4
