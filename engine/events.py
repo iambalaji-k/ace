@@ -6,7 +6,7 @@ Handles creation and visibility projections (Public, Player, Observer) of events
 
 from typing import Optional, Dict, Any
 from dataclasses import replace
-from engine.types import Event
+from engine.types import Event, EngineState
 
 
 def create_event(
@@ -66,3 +66,27 @@ def project_event_for_player(event: Event, viewer_id: int) -> Event:
 def project_event_observer(event: Event) -> Event:
     """Observer sees everything. Returns the event unchanged."""
     return event
+
+
+def get_player_view(state: EngineState, player_id: int) -> EngineState:
+    """Project the EngineState for a specific player, masking private details of others."""
+    if state.round_state is None:
+        return state
+
+    round_st = state.round_state
+    masked_players = []
+    for p in round_st.players:
+        if p.player_id == player_id:
+            masked_players.append(p)
+        else:
+            # Mask opponent hand with -1 to keep size but hide rank/suit
+            masked_hand = (-1,) * len(p.hand)
+            masked_players.append(replace(p, hand=masked_hand))
+
+    new_round_state = replace(
+        round_st,
+        players=tuple(masked_players),
+        discard_pile=()  # Hide the discard history from players
+    )
+
+    return replace(state, round_state=new_round_state)

@@ -6,12 +6,9 @@ Parses JSON compliance test cases and validates them against the AceEngine simul
 
 import json
 import glob
-import pytest
-from typing import List
 from engine.rules import AceEngine, Success, Error
 from engine.types import (
-    StealAction, DeclineStealAction, PlayCardAction, Action, RoundStarting,
-    AwaitingStealDecision, AwaitingCardPlay
+    StealAction, DeclineStealAction, PlayCardAction, Action, RoundStarting
 )
 
 

@@ -2,11 +2,12 @@
 """Data model definitions for the Ace Engine.
 
 Implements all match, round, and runtime state structures as frozen (immutable) dataclasses.
-Also contains action types, game phases, and event representations.
+Also contains action types, game phases, and event representations. All sequences are
+stored as tuples to ensure true immutability.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 
 # --- Seating & Match Levels ---
@@ -25,7 +26,7 @@ class PlayerState:
 class RoundResult:
     round_number: int
     loser_id: Optional[int]  # None if draw
-    winner_ids: List[int]
+    winner_ids: Tuple[int, ...]
     is_draw: bool
 
 
@@ -41,7 +42,7 @@ class PlayerRanking:
 
 @dataclass(frozen=True)
 class MatchResult:
-    rankings: List[PlayerRanking]
+    rankings: Tuple[PlayerRanking, ...]
     total_rounds: int
     draws: int
 
@@ -52,9 +53,9 @@ class MatchState:
     num_rounds: int
     current_round: int  # 1-indexed
     match_seed: int
-    players: List[PlayerState]  # ordered by seat index
-    seating_order: List[int]  # seat indices, clockwise
-    round_results: List[RoundResult]  # one per completed round
+    players: Tuple[PlayerState, ...]  # ordered by seat index
+    seating_order: Tuple[int, ...]  # seat indices, clockwise
+    round_results: Tuple[RoundResult, ...]  # one per completed round
     status: str  # "INIT", "IN_PROGRESS", "COMPLETE"
 
 
@@ -63,7 +64,7 @@ class MatchState:
 @dataclass(frozen=True)
 class RoundPlayerState:
     player_id: int
-    hand: List[int]  # card IDs (0-51) in canonical sort order
+    hand: Tuple[int, ...]  # card IDs (0-51) in canonical sort order
     is_active: bool
     is_round_winner: bool
     is_round_loser: bool
@@ -79,7 +80,7 @@ class TrickPlay:
 class StealEvent:
     stealer_id: int
     victim_id: int
-    cards_taken: List[int]  # card IDs
+    cards_taken: Tuple[int, ...]  # card IDs
 
 
 @dataclass(frozen=True)
@@ -87,30 +88,30 @@ class TrickState:
     trick_number: int
     lead_player_id: int
     lead_suit: Optional[int]  # suit code 0-3 (None before lead card is played)
-    plays: List[TrickPlay]  # cards played, in sequence
+    plays: Tuple[TrickPlay, ...]  # cards played, in sequence
     status: str  # "STEAL_PHASE", "PLAY_PHASE", "RESOLVED"
-    steals: List[StealEvent]  # steals occurring *before* or during this trick
+    steals: Tuple[StealEvent, ...]  # steals occurring *before* or during this trick
 
 
 @dataclass(frozen=True)
 class CompletedTrick:
     trick_number: int
-    plays: List[TrickPlay]
+    plays: Tuple[TrickPlay, ...]
     outcome: str  # "DISCARDED" | "INTERRUPTED"
     collector_id: Optional[int]
-    collected_cards: List[int]  # empty if discarded
+    collected_cards: Tuple[int, ...]  # empty if discarded
 
 
 @dataclass(frozen=True)
 class RoundState:
     round_number: int
     round_seed: int
-    players: List[RoundPlayerState]  # ordered by seat index
-    active_player_ids: List[int]  # remaining active player IDs, in seat order
+    players: Tuple[RoundPlayerState, ...]  # ordered by seat index
+    active_player_ids: Tuple[int, ...]  # remaining active player IDs, in seat order
     current_trick: Optional[TrickState]
-    trick_history: List[CompletedTrick]
+    trick_history: Tuple[CompletedTrick, ...]
     lead_player_id: int
-    discard_pile: List[int]  # card IDs, face-down
+    discard_pile: Tuple[int, ...]  # card IDs, face-down
     status: str  # "INIT", "IN_PROGRESS", "COMPLETE"
 
 
@@ -173,7 +174,7 @@ class RuntimeState:
     action_sequence_number: int
     current_phase: GamePhase
     current_player_id: Optional[int]
-    pending_legal_actions: List[Action]
+    pending_legal_actions: Tuple[Action, ...]
     prng_state: int
 
 

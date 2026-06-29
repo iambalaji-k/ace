@@ -5,7 +5,7 @@ Implements the AceEngine class containing all match transitions, legal action ge
 trick resolution, and scoring logic.
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Sequence
 from dataclasses import replace
 
 from engine.card import get_suit, get_rank
@@ -40,13 +40,13 @@ class Success(ActionResult):
 
 
 class Error(ActionResult):
-    def __init__(self, error_code: str, message: str, legal_actions: List[Action]):
+    def __init__(self, error_code: str, message: str, legal_actions: Sequence[Action]):
         self.error_code = error_code
         self.message = message
         self.legal_actions = legal_actions
 
 
-def get_immediate_active_left(player_id: int, active_player_ids: List[int], num_players: int) -> int:
+def get_immediate_active_left(player_id: int, active_player_ids: Sequence[int], num_players: int) -> int:
     """Find the next active player clockwise from the given player_id."""
     active_set = set(active_player_ids)
     curr = (player_id + 1) % num_players
@@ -83,9 +83,9 @@ class AceEngine:
             num_rounds=num_rounds,
             current_round=1,
             match_seed=match_seed,
-            players=players,
-            seating_order=list(range(num_players)),
-            round_results=[],
+            players=tuple(players),
+            seating_order=tuple(range(num_players)),
+            round_results=(),
             status="INIT"
         )
 
@@ -95,7 +95,7 @@ class AceEngine:
             action_sequence_number=0,
             current_phase=RoundStarting(round_number=1),
             current_player_id=None,
-            pending_legal_actions=[],
+            pending_legal_actions=(),
             prng_state=initial_prng_state
         )
 
@@ -118,7 +118,7 @@ class AceEngine:
         return state.runtime_state.current_phase
 
     @staticmethod
-    def get_legal_actions(state: EngineState) -> List[Action]:
+    def get_legal_actions(state: EngineState) -> Sequence[Action]:
         """Get the list of pending legal actions from runtime state."""
         return state.runtime_state.pending_legal_actions
 
@@ -258,7 +258,7 @@ class AceEngine:
         round_players = [
             RoundPlayerState(
                 player_id=i,
-                hand=hands[i],
+                hand=tuple(hands[i]),
                 is_active=True,
                 is_round_winner=False,
                 is_round_loser=False
@@ -270,20 +270,20 @@ class AceEngine:
             trick_number=1,
             lead_player_id=lead_player_id,
             lead_suit=None,
-            plays=[],
+            plays=(),
             status="STEAL_PHASE",
-            steals=[]
+            steals=()
         )
 
         round_state = RoundState(
             round_number=r,
             round_seed=round_seed,
-            players=round_players,
-            active_player_ids=list(range(num_players)),
+            players=tuple(round_players),
+            active_player_ids=tuple(range(num_players)),
             current_trick=trick,
-            trick_history=[],
+            trick_history=(),
             lead_player_id=lead_player_id,
-            discard_pile=[],
+            discard_pile=(),
             status="IN_PROGRESS"
         )
 
@@ -309,7 +309,7 @@ class AceEngine:
             state.runtime_state,
             current_phase=next_phase,
             current_player_id=lead_player_id,
-            pending_legal_actions=legal_actions
+            pending_legal_actions=tuple(legal_actions)
         )
 
         new_state = EngineState(
@@ -391,15 +391,15 @@ class AceEngine:
 
             stolen_cards = list(victim.hand)
             # Remove from victim, merge into stealer
-            new_stealer_hand = sorted(stealer.hand + stolen_cards)
+            new_stealer_hand = tuple(sorted(list(stealer.hand) + stolen_cards))
 
             new_round_players[stealer_idx] = replace(stealer, hand=new_stealer_hand)
-            new_round_players[victim_idx] = replace(victim, hand=[], is_active=False, is_round_winner=True)
+            new_round_players[victim_idx] = replace(victim, hand=(), is_active=False, is_round_winner=True)
             new_active_players.remove(target_id)
 
             # Record steal in trick
-            new_steals = list(trick.steals) + [StealEvent(stealer_id=action.player_id, victim_id=target_id, cards_taken=stolen_cards)]
-            new_trick = replace(trick, steals=new_steals)
+            new_steals = list(trick.steals) + [StealEvent(stealer_id=action.player_id, victim_id=target_id, cards_taken=tuple(stolen_cards))]
+            new_trick = replace(trick, steals=tuple(new_steals))
 
             events.append(Event(
                 sequence=len(events) + seq,
@@ -521,15 +521,15 @@ class AceEngine:
                 # Give all cards in the plays to collector's hand
                 collector_idx = next(i for i, p in enumerate(new_round_players) if p.player_id == collector_id)
                 collector_state = new_round_players[collector_idx]
-                merged_hand = sorted(collector_state.hand + collected_cards)
+                merged_hand = tuple(sorted(list(collector_state.hand) + collected_cards))
                 new_round_players[collector_idx] = replace(collector_state, hand=merged_hand)
 
                 completed = CompletedTrick(
                     trick_number=trick.trick_number,
-                    plays=new_plays,
+                    plays=tuple(new_plays),
                     outcome="INTERRUPTED",
                     collector_id=collector_id,
-                    collected_cards=collected_cards
+                    collected_cards=tuple(collected_cards)
                 )
                 new_trick_history.append(completed)
 
@@ -570,10 +570,10 @@ class AceEngine:
 
                 completed = CompletedTrick(
                     trick_number=trick.trick_number,
-                    plays=new_plays,
+                    plays=tuple(new_plays),
                     outcome="DISCARDED",
                     collector_id=None,
-                    collected_cards=[]
+                    collected_cards=()
                 )
                 new_trick_history.append(completed)
 
@@ -680,9 +680,9 @@ class AceEngine:
                         trick_number=next_trick_num,
                         lead_player_id=next_lead_player_id,
                         lead_suit=None,
-                        plays=[],
+                        plays=(),
                         status="STEAL_PHASE",
-                        steals=[]
+                        steals=()
                     )
 
                     events.append(Event(
@@ -699,7 +699,7 @@ class AceEngine:
 
                     steal_target = get_immediate_active_left(next_lead_player_id, new_active_players, num_players)
                     next_phase = AwaitingStealDecision(player_id=next_lead_player_id, steal_target=steal_target)
-                    actions: List[Action] = [
+                    actions: Sequence[Action] = [
                         StealAction(player_id=next_lead_player_id),
                         DeclineStealAction(player_id=next_lead_player_id)
                     ]
@@ -714,11 +714,11 @@ class AceEngine:
         if round_ended:
             new_round_state = replace(
                 round_st,
-                players=new_round_players,
-                active_player_ids=new_active_players,
+                players=tuple(new_round_players),
+                active_player_ids=tuple(new_active_players),
                 current_trick=None,
-                trick_history=new_trick_history,
-                discard_pile=new_discard_pile,
+                trick_history=tuple(new_trick_history),
+                discard_pile=tuple(new_discard_pile),
                 status="COMPLETE"
             )
 
@@ -726,7 +726,7 @@ class AceEngine:
             round_res = RoundResult(
                 round_number=round_st.round_number,
                 loser_id=round_loser_id,
-                winner_ids=round_winner_ids,
+                winner_ids=tuple(round_winner_ids),
                 is_draw=is_draw
             )
             new_round_results.append(round_res)
@@ -812,7 +812,7 @@ class AceEngine:
 
                 total_draws = sum(1 for r in new_round_results if r.is_draw)
                 match_res = MatchResult(
-                    rankings=rankings,
+                    rankings=tuple(rankings),
                     total_rounds=match.num_rounds,
                     draws=total_draws
                 )
@@ -831,7 +831,7 @@ class AceEngine:
                 ))
 
                 next_phase = MatchComplete(result=match_res)
-                legal_actions = []
+                legal_actions: Sequence[Action] = []
                 current_player_id = None
             else:
                 # Next round setup
@@ -842,11 +842,11 @@ class AceEngine:
             # Round continues, construct next RoundState
             new_round_state = replace(
                 round_st,
-                players=new_round_players,
-                active_player_ids=new_active_players,
+                players=tuple(new_round_players),
+                active_player_ids=tuple(new_active_players),
                 current_trick=new_trick,
-                trick_history=new_trick_history,
-                discard_pile=new_discard_pile
+                trick_history=tuple(new_trick_history),
+                discard_pile=tuple(new_discard_pile)
             )
             if isinstance(next_phase, (AwaitingStealDecision, AwaitingCardPlay)):
                 current_player_id = next_phase.player_id
@@ -856,8 +856,8 @@ class AceEngine:
         # Update MatchState
         new_match_state = replace(
             match,
-            players=new_match_players,
-            round_results=new_round_results,
+            players=tuple(new_match_players),
+            round_results=tuple(new_round_results),
             status=new_match_status
         )
 
@@ -867,7 +867,7 @@ class AceEngine:
             action_sequence_number=seq,
             current_phase=next_phase,
             current_player_id=current_player_id,
-            pending_legal_actions=legal_actions
+            pending_legal_actions=tuple(legal_actions)
         )
 
         new_state = EngineState(

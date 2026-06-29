@@ -12,7 +12,7 @@ sys.path.append('.')
 
 from engine.rules import AceEngine, Success, Error, get_immediate_active_left
 from engine.types import (
-    StealAction, DeclineStealAction, PlayCardAction, RoundStarting,
+    Action, StealAction, DeclineStealAction, PlayCardAction, RoundStarting,
     AwaitingStealDecision, AwaitingCardPlay, EngineState, RoundState,
     RoundPlayerState, TrickState, Event
 )
@@ -34,7 +34,7 @@ def get_input_in_range(prompt: str, min_val: int, max_val: int, default: int) ->
             print("Error: Please enter a valid integer.")
 
 
-def parse_card_list(input_str: str, assigned: set) -> list[int]:
+def parse_card_list(input_str: str, assigned: set[int]) -> list[int]:
     """Parse a comma/space separated list of card names (e.g. 'A♠, 7♦') or card IDs (0-51)."""
     if not input_str.strip():
         return []
@@ -184,7 +184,7 @@ def setup_custom_deal(state: EngineState, round_num: int, num_players: int) -> t
     round_players = [
         RoundPlayerState(
             player_id=i,
-            hand=custom_hands[i],
+            hand=tuple(custom_hands[i]),
             is_active=True,
             is_round_winner=False,
             is_round_loser=False
@@ -195,20 +195,20 @@ def setup_custom_deal(state: EngineState, round_num: int, num_players: int) -> t
         trick_number=1,
         lead_player_id=lead_player_id,
         lead_suit=None,
-        plays=[],
+        plays=(),
         status="STEAL_PHASE",
-        steals=[]
+        steals=()
     )
 
     round_state = RoundState(
         round_number=round_num,
         round_seed=0,
-        players=round_players,
-        active_player_ids=list(range(num_players)),
+        players=tuple(round_players),
+        active_player_ids=tuple(range(num_players)),
         current_trick=trick,
-        trick_history=[],
+        trick_history=(),
         lead_player_id=lead_player_id,
-        discard_pile=[],
+        discard_pile=(),
         status="IN_PROGRESS"
     )
 
@@ -226,7 +226,7 @@ def setup_custom_deal(state: EngineState, round_num: int, num_players: int) -> t
         state.runtime_state,
         current_phase=next_phase,
         current_player_id=lead_player_id,
-        pending_legal_actions=legal_actions
+        pending_legal_actions=tuple(legal_actions)
     )
 
     new_state = EngineState(
@@ -298,7 +298,7 @@ def main():
 
         # Check if the engine needs an auto-advance (e.g. starting a new round)
         if isinstance(phase, RoundStarting):
-            print(f"\n" + "-" * 60)
+            print("\n" + "-" * 60)
             print(f"--- Starting Round {phase.round_number} ---")
             print("-" * 60)
             
@@ -377,7 +377,7 @@ def main():
 
         if isinstance(res, Error):
             print(f"\n[Error] {res.message}")
-        else:
+        elif isinstance(res, Success):
             state = res.new_state
             print(f"\nAction Applied: {action}")
             for ev in res.events:

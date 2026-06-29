@@ -1,7 +1,6 @@
 # tests/test_foundations.py
-import pytest
 from engine.card import get_suit, get_rank, card_to_str, str_to_card, sort_cards
-from engine.prng import pcg_seed, pcg_next, derive_round_seed, deterministic_shuffle
+from engine.prng import pcg_seed, pcg_next, derive_round_seed
 from engine.deck import get_reserved_aces, build_and_deal_deck
 
 
