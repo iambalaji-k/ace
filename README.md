@@ -186,7 +186,59 @@ runner.export_to_csv(results, "benchmarks/")
 
 ---
 
-## 🗺️ Project Roadmap & Pending Phases
+## 🤖 AI Agents (Heuristics, MCTS, and Self-Learning)
+
+The Ace Engine features three distinct tiers of artificial intelligence, transitioning from structured rule-based systems to deep self-play reinforcement learning:
+
+### 1. Evolved Heuristic Agent (`HeuristicAgentV2`)
+* **Core Logic**: An expert-rule system containing **55 distinct card-play and steal heuristics** categorized by match phase (Opening, Middle, Endgame) and hand configurations.
+* **Optimization (Genetic Algorithm)**: Co-evolves both the 55 heuristic weights and **11 strategic parameter thresholds** (e.g. opponent void risk limits, suit-hoarding boundaries) to maximize match placement outcomes.
+* **Training Command**:
+  ```bash
+  python scripts/train_genetic_weights.py
+  ```
+  *(Optimizes weights and outputs updated parameters to `engine/heuristic_v2_weights.json`)*.
+
+### 2. Monte Carlo Tree Search Agent (`MCTSAgent`)
+* **Core Logic**: Implements **Information Set MCTS (ISMCTS)** to play under imperfect information.
+* **Hand Determinization**: Features a backtracking constraint satisfaction search that generates random opponent hands matching all `CardTracker` void suits, known cards, and current trick cards.
+* **Heuristic-Guided Rollouts**: Utilizes our evolved `HeuristicAgentV2` to make playout choices, producing high-fidelity rollouts and extremely fast search convergence on CPU.
+* **Evaluation Command**:
+  ```bash
+  python scripts/evaluate_mcts_agent.py
+  ```
+
+### 3. Self-Learning RL Agent (`RLAgent`)
+* **Core Logic**: A pure reinforcement learning agent trained entirely from scratch with **zero human bias**.
+* **Model**: A lightweight dual Actor-Critic network (`AceNet` in PyTorch) running state vectorization (343 input features) and legal action masking.
+* **Training Method**: REINFORCE Policy Gradient with Advantage baseline, highly optimized to complete thousands of training matches on a standard **CPU** in under 5 minutes.
+* **Training & Evaluation Commands**:
+  ```bash
+  # Train the agent (saves weights to engine/rl_champion.pt)
+  python scripts/train_self_play.py
+
+  # Benchmark RL Agent against Heuristic V2
+  python scripts/evaluate_rl_agent.py
+  ```
+
+---
+
+## 🎮 Play Against the Agents (CLI Interface)
+
+You can play interactive card matches directly against these agents in your terminal:
+
+* **Play against Heuristic bots**:
+  ```bash
+  python scripts/play_against_heuristic.py
+  ```
+* **Play against the trained RL Champion bots**:
+  ```bash
+  python scripts/play_against_rl.py
+  ```
+
+---
+
+## 🗺️ Project Roadmap & Status
 
 - [x] **Phase 0**: Repository Setup & Core Infrastructure Documents
 - [x] **Phase 1**: Chapter 1–11 Protocol Specification drafting
@@ -196,8 +248,8 @@ runner.export_to_csv(results, "benchmarks/")
 - [x] **Phase 5**: Appendix/Replay Player (Undo, Redo, Branching)
 - [x] **Phase 6**: Tournament runner & Statistical CSV exporter
 - [x] **Phase 7**: Random AI Agent baseline integration
-- [ ] **Phase 8**: **Heuristic AI Agent** (Rule-based weights strategy bot)
-- [ ] **Phase 9**: **Monte Carlo AI Agent** (Information-Set MCTS algorithm)
-- [ ] **Phase 10**: **Neural AI Agent** (Deep learning tensor observations)
-- [ ] **Phase 11**: **Reinforcement Learning Pipeline** (Gym step adapter & self-play loops)
+- [x] **Phase 8**: **Heuristic AI Agent** (Rule-based weights co-evolved via Genetic Algorithm)
+- [x] **Phase 9**: **Monte Carlo AI Agent** (Imperfect Information MCTS with guided rollouts)
+- [ ] **Phase 10**: **Neural AI Agent** (Deep learning observation tensors)
+- [x] **Phase 11**: **Reinforcement Learning Pipeline** (Model-free self-play REINFORCE on CPU)
 - [ ] **Phase 12**: **Optimization & Benchmarking** (1,000,000 game runs hot-path profiling)
