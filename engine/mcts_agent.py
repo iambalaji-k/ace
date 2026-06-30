@@ -175,7 +175,12 @@ class MCTSAgent(BaseAgent):
             return legal_actions[0]
             
         # Reconstruct CardTracker facts
-        tracker = CardTracker(num_players=len(player_view.round_state.players))
+        num_players = len(player_view.round_state.players)
+        for p in range(num_players):
+            if p not in self.rollout_agents:
+                self.rollout_agents[p] = HeuristicAgentV2(player_id=p, seed=self.rng.randint(0, 100000))
+
+        tracker = CardTracker(num_players=num_players)
         tracker.reconstruct(
             viewer_id=self.player_id,
             round_state=player_view.round_state,

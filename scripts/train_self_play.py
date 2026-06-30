@@ -21,7 +21,7 @@ from engine.encoder import encode_state
 from engine.model import AceNet
 from engine.rl_agent import RLAgent, action_to_idx
 
-def play_self_play_match(model: AceNet, seed: int) -> Tuple[List[dict], dict]:
+def play_self_play_match(model: AceNet, seed: int) -> tuple[list[dict], dict]:
     """Plays a single self-play match and returns player trajectories and match stats."""
     num_players = 4
     num_rounds = 5
@@ -119,7 +119,7 @@ def play_self_play_match(model: AceNet, seed: int) -> Tuple[List[dict], dict]:
             
     return samples, {'rounds_lost': rounds_lost, 'total_rounds': len(state.match_state.round_results)}
 
-def train_self_play(epochs: int = 5, matches_per_epoch: int = 15):
+def train_self_play(epochs: int = 300, matches_per_epoch: int = 15):
     """Executes the self-play reinforcement learning loop on CPU."""
     print("====================================================")
     print("===   SELF-PLAY RL TRAINING PIPELINE (CPU)       ===")

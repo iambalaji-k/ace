@@ -27,3 +27,7 @@ replays/*.json
 replays/*.msgpack
 *.log
 *.csv
+
+# RL Agent training checkpoints and active models
+engine/checkpoints/
+engine/rl_active*.pt
