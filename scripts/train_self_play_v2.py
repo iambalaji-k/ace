@@ -44,8 +44,11 @@ except ImportError:
 
 class LeagueMCTSAgent(MCTSAgent):
     """CPU-friendly MCTS Agent with lower iterations for fast training lookahead."""
-    def __init__(self, player_id: int, seed=None):
-        super().__init__(player_id, seed=seed, max_iterations=100, time_limit=0.15)
+    def __init__(self, player_id: int, num_players: int, seed=None):
+        # Throttle iterations dynamically based on player count to prevent CPU bottlenecks
+        iterations_map = {3: 100, 4: 80, 5: 60, 6: 40}
+        iters = iterations_map.get(num_players, 80)
+        super().__init__(player_id, seed=seed, max_iterations=iters, time_limit=0.15)
 
 
 def sample_opponent(active_model: AceNetV2, checkpoints_dir: str, player_id: int, seed: int, num_players: int) -> BaseAgent:
@@ -68,7 +71,7 @@ def sample_opponent(active_model: AceNetV2, checkpoints_dir: str, player_id: int
     elif r < 0.70:  # Heuristic V2
         return HeuristicAgentV2(player_id=player_id, seed=seed)
     elif r < 0.85:  # MCTS (CPU optimized iterations)
-        return LeagueMCTSAgent(player_id=player_id, seed=seed)
+        return LeagueMCTSAgent(player_id=player_id, num_players=num_players, seed=seed)
     else:  # RL v1.0 / Random
         # RL v1.0 is strictly hardcoded to 4 players. For other sizes, fallback to RandomAgent.
         if RL_V1_AVAILABLE and num_players == 4:
@@ -77,7 +80,8 @@ def sample_opponent(active_model: AceNetV2, checkpoints_dir: str, player_id: int
             return RandomAgent(player_id=player_id, seed=seed)
 
 
-def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int) -> List[Dict[str, Any]]:
+
+def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int) -> Tuple[List[Dict[str, Any]], Dict[str, float]]:
     """Plays a single match, accumulating rewards across opponent turns, and finalizes round transitions."""
     num_players = random.randint(3, 6)
     num_rounds = random.randint(3, 7)
@@ -108,6 +112,15 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
     accumulated_reward = 0.0
     round_win_rewarded = False
     last_played_card = {}
+
+    reward_sums = {
+        "round_victory": 0.0,
+        "steal_penalty": 0.0,
+        "suit_break": 0.0,
+        "discard": 0.0,
+        "round_loss": 0.0,
+        "endgame_bonus": 0.0
+    }
 
     while not AceEngine.is_terminal(state):
         phase = AceEngine.get_game_phase(state)
@@ -185,6 +198,7 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
         if state.round_state.players[learning_player_id].is_active and not is_active and not p_state.is_round_loser:
             if not round_win_rewarded:
                 accumulated_reward += 1.0
+                reward_sums["round_victory"] += 1.0
                 round_win_rewarded = True
 
         for event in events:
@@ -196,16 +210,21 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
                     # Non-overlapping victory reward for steal escape
                     if not round_win_rewarded:
                         accumulated_reward += 1.0
+                        reward_sums["round_victory"] += 1.0
                         round_win_rewarded = True
                 elif payload["stealer_id"] == learning_player_id:
                     # Penalty for hand overloading
-                    accumulated_reward -= 0.05 * len(payload["cards"])
+                    penalty = 0.05 * len(payload["cards"])
+                    accumulated_reward -= penalty
+                    reward_sums["steal_penalty"] -= penalty
 
             elif e_type == "TRICK_COMPLETED":
                 outcome = payload["outcome"]
                 if outcome == "INTERRUPTED":
                     if payload["collector_id"] == learning_player_id:
-                        accumulated_reward -= 0.05 * len(payload["cards_collected"])
+                        penalty = 0.05 * len(payload["cards_collected"])
+                        accumulated_reward -= penalty
+                        reward_sums["steal_penalty"] -= penalty
                     else:
                         # Interruption Causality: check if learner broke suit
                         if learning_player_id in last_played_card and payload["cards_collected"]:
@@ -214,19 +233,23 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
                             # If card was played in this trick and suit didn't match lead suit
                             if card_played in payload["cards_collected"] and get_suit(card_played) != lead_suit:
                                 accumulated_reward += 0.10  # Reward for forcing opponent collection
+                                reward_sums["suit_break"] += 0.10
                 elif outcome == "DISCARDED":
                     # Discard reward: verify card played by learner was discarded
                     if learning_player_id in last_played_card:
                         card_played = last_played_card[learning_player_id]
                         if card_played in payload["cards_discarded"]:
-                            accumulated_reward += 0.02
+                            accumulated_reward += 0.015
+                            reward_sums["discard"] += 0.015
 
             elif e_type == "ROUND_ENDED":
                 if payload["loser_id"] == learning_player_id:
                     accumulated_reward -= 1.0
+                    reward_sums["round_loss"] -= 1.0
                 elif learning_player_id in payload["winner_ids"]:
                     if not round_win_rewarded:
                         accumulated_reward += 1.0
+                        reward_sums["round_victory"] += 1.0
                         round_win_rewarded = True
 
         # Endgame risk mitigation bonus (small weight, potential-based representation)
@@ -236,7 +259,9 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
         if avg_size <= 4.0 and is_active:
             own_hand = new_state.round_state.players[learning_player_id].hand
             low_cards = sum(1 for c in own_hand if (c % 13) >= 9)
-            accumulated_reward += 0.005 * low_cards
+            bonus = 0.005 * low_cards
+            accumulated_reward += bonus
+            reward_sums["endgame_bonus"] += bonus
 
         # Append new step on the learner's decision turn
         if is_learning_turn:
@@ -256,7 +281,9 @@ def collect_match_trajectories(model: AceNetV2, checkpoints_dir: str, seed: int)
         trajectories[-1]['reward'] = accumulated_reward
         trajectories[-1]['done'] = True
 
-    return trajectories
+    return trajectories, reward_sums
+
+
 
 
 def compute_gae(trajectories: List[Dict[str, Any]], values: np.ndarray, next_value: float, gamma: float = 0.99, lam: float = 0.95) -> Tuple[List[float], List[float]]:
@@ -278,7 +305,7 @@ def compute_gae(trajectories: List[Dict[str, Any]], values: np.ndarray, next_val
 
 
 def run_gating_tournament(candidate_model: AceNetV2, champion_path: str) -> Tuple[bool, float, float]:
-    """Evaluates the candidate model against the incumbent champion over 36 seat-balanced matches.
+    """Evaluates the candidate model against the incumbent champion over 102 seat-balanced matches.
 
     Returns (promoted, candidate_survival, champion_survival).
     """
@@ -311,8 +338,8 @@ def run_gating_tournament(candidate_model: AceNetV2, champion_path: str) -> Tupl
     cand_losses = 0
     champ_losses = 0
 
-    # Run 6 cycles of permutations with seed pairing
-    for cycle in range(6):
+    # Run 17 cycles of permutations with seed pairing (17 * 6 = 102 matches)
+    for cycle in range(17):
         seed = 45000 + cycle
         for layout in permutations:
             config = TournamentConfig(
@@ -331,15 +358,35 @@ def run_gating_tournament(candidate_model: AceNetV2, champion_path: str) -> Tupl
                     else:
                         champ_losses += 1
 
-    cand_surv = 1.0 - (cand_losses / (36 * 5 * 2))
-    champ_surv = 1.0 - (champ_losses / (36 * 5 * 2))
+    cand_surv = 1.0 - (cand_losses / (102 * 5 * 2))
+    champ_surv = 1.0 - (champ_losses / (102 * 5 * 2))
     print(f"[GATING] Candidate Survival: {cand_surv*100.0:.2f}% | Champion Survival: {champ_surv*100.0:.2f}%")
 
-    # Candidate wins if its survival rate is strictly higher
+    # Candidate wins if its survival rate is higher
     return cand_surv > champ_surv, cand_surv, champ_surv
 
 
+class Tee:
+    def __init__(self, filename, mode="a"):
+        self.file = open(filename, mode, encoding="utf-8")
+        self.stdout = sys.stdout
+
+    def write(self, message):
+        self.stdout.write(message)
+        self.file.write(message)
+        self.file.flush()
+
+    def flush(self):
+        self.stdout.flush()
+        self.file.flush()
+
+
 def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
+    # Redirect stdout to both console and a log file
+    log_dir = "engine/logs"
+    os.makedirs(log_dir, exist_ok=True)
+    sys.stdout = Tee(os.path.join(log_dir, "train_self_play.log"), "a")
+
     print("====================================================")
     print("===   RL AGENT 2.0 PPO TRAINING PIPELINE (CPU)   ===")
     print("====================================================\n")
@@ -397,12 +444,24 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
         total_match_rounds = 0
         total_rewards = 0.0
 
+        epoch_reward_components = {
+            "round_victory": 0.0,
+            "steal_penalty": 0.0,
+            "suit_break": 0.0,
+            "discard": 0.0,
+            "round_loss": 0.0,
+            "endgame_bonus": 0.0
+        }
+
         # 1. Rollout Collection phase
         for m in range(matches_per_epoch):
             seed = epoch * 10000 + m
-            trajectories = collect_match_trajectories(model, checkpoints_dir, seed)
+            trajectories, match_rewards = collect_match_trajectories(model, checkpoints_dir, seed)
             if not trajectories:
                 continue
+
+            for k in epoch_reward_components:
+                epoch_reward_components[k] += match_rewards[k]
 
             # Forward pass to get values for GAE
             states_vecs = np.array([t['state'] for t in trajectories])
@@ -443,6 +502,9 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
             num_samples = len(all_states)
             early_stop = False
 
+            # Adaptive Entropy Annealing: decrease from 0.02 to 0.002 over first 100 epochs
+            ent_coef = max(0.002, 0.02 - (0.02 - 0.002) * (epoch - 1) / 100.0)
+
             # PPO Updates
             for update_epoch in range(4):
                 if early_stop:
@@ -453,6 +515,7 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
                 epoch_policy_losses = []
                 epoch_value_losses = []
                 epoch_entropy_losses = []
+                epoch_raw_entropies = []
                 epoch_clip_fractions = []
 
                 for start_idx in range(0, num_samples, batch_size):
@@ -495,7 +558,8 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
                     # Value Loss (Critic)
                     value_loss = F.mse_loss(values.squeeze(1), b_returns)
                     # Entropy Regularization
-                    entropy_loss = -0.01 * entropies.mean()
+                    raw_ent = entropies.mean()
+                    entropy_loss = -ent_coef * raw_ent
 
                     # Total update loss
                     total_loss = policy_loss + 0.5 * value_loss + entropy_loss
@@ -517,16 +581,18 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
                     epoch_policy_losses.append(policy_loss.item())
                     epoch_value_losses.append(value_loss.item())
                     epoch_entropy_losses.append(entropy_loss.item())
+                    epoch_raw_entropies.append(raw_ent.item())
 
                 # End of PPO epoch: check average KL divergence
                 mean_kl = np.mean(epoch_kls)
                 mean_pol = np.mean(epoch_policy_losses)
                 mean_val = np.mean(epoch_value_losses)
                 mean_ent = np.mean(epoch_entropy_losses)
+                mean_raw_ent = np.mean(epoch_raw_entropies)
                 mean_clip = np.mean(epoch_clip_fractions)
 
                 # Log metrics for debugging
-                print(f"  [PPO Epoch {update_epoch+1}/4] Policy Loss: {mean_pol:.4f} | Value Loss: {mean_val:.4f} | Entropy: {-mean_ent:.4f} | Clip Frac: {mean_clip:.4f} | KL: {mean_kl:.4f}")
+                print(f"  [PPO Epoch {update_epoch+1}/4] Policy Loss: {mean_pol:.4f} | Value Loss: {mean_val:.4f} | Entropy (Raw): {mean_raw_ent:.4f} | Clip Frac: {mean_clip:.4f} | KL: {mean_kl:.4f}")
 
                 if mean_kl > 0.02:
                     print(f"  [PPO] Early stopping update at epoch {update_epoch+1} (approx KL {mean_kl:.4f} > 0.02)")
@@ -535,6 +601,8 @@ def train_self_play_v2(epochs: int = 200, matches_per_epoch: int = 20):
         epoch_dur = time.time() - epoch_start
         avg_reward = total_rewards / max(1, total_match_rounds)
         print(f"Epoch {epoch:02d}/{epochs:02d} | Steps: {len(all_states):4d} | Avg Step Reward: {avg_reward:.4f} | Time: {epoch_dur:.2f}s")
+        print(f"  [REWARDS] Win: {epoch_reward_components['round_victory']:.2f} | Loss: {epoch_reward_components['round_loss']:.2f} | Steal Pen: {epoch_reward_components['steal_penalty']:.2f} | Break: {epoch_reward_components['suit_break']:.2f} | Discard: {epoch_reward_components['discard']:.2f} | Endgm: {epoch_reward_components['endgame_bonus']:.2f}")
+        print(f"  [ENTROPY] Coeff: {ent_coef:.4f}")
 
         # Periodically save active checkpoints (every 10 epochs)
         if epoch % 10 == 0:

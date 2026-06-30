@@ -195,6 +195,9 @@ class MCTSAgent(BaseAgent):
             if time.time() - start_time >= self.time_limit:
                 break
                 
+            # Clear CardTracker cache to prevent cross-determinization leak
+            CardTracker._get_cache().clear()
+            
             # 1. Determinization
             det_state = project_determinization(self.player_id, tracker, player_view, self.rng)
             

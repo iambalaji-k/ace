@@ -5,6 +5,7 @@ Implements clean separation of facts (CardTracker), estimations (ProbabilityEsti
 lazy pre-extracted features (FeatureExtractor / EvaluationContext), and ABC rules.
 """
 
+import threading
 from typing import Sequence, Tuple, List, Optional, Dict, Set, Any
 from dataclasses import dataclass, replace
 from abc import ABC, abstractmethod
@@ -28,8 +29,18 @@ def get_power_rank(card: int) -> int:
 # 1. Facts, Estimations & Derived Metrics
 # =====================================================================
 
+
 class CardTracker:
     """Tracks direct public observations and deterministic reconstructions (100% Facts)."""
+
+    # Thread-local cache for prefix-based incremental reconstruction
+    _thread_local = threading.local()
+
+    @classmethod
+    def _get_cache(cls):
+        if not hasattr(cls._thread_local, 'cache'):
+            cls._thread_local.cache = {}
+        return cls._thread_local.cache
 
     def __init__(self, num_players: int):
         self.num_players = num_players
@@ -43,6 +54,15 @@ class CardTracker:
         self.discards = [set() for _ in range(4)]
         # Track active/inactive player status trick-by-trick
         self.active_players_state = [True] * num_players
+
+    def clone(self) -> 'CardTracker':
+        """Deep copies the factual card tracker state."""
+        cloned = CardTracker(self.num_players)
+        cloned.card_locations = list(self.card_locations)
+        cloned.is_void = [list(v) for v in self.is_void]
+        cloned.player_known_cards = [set(k) for k in self.player_known_cards]
+        cloned.discards = [set(d) for d in self.discards]
+        return cloned
 
     def record_own_hand(self, viewer_id: int, hand: Tuple[int, ...]):
         for card in hand:
@@ -66,30 +86,74 @@ class CardTracker:
 
     def reconstruct(self, viewer_id: int, round_state, match_state):
         num_players = self.num_players
-        self.record_own_hand(viewer_id, round_state.players[viewer_id].hand)
+        cache = self._get_cache()
+        match_seed = match_state.match_seed
 
-        # Reserved aces assignment at round start
-        r = round_state.round_number
-        recipient_id = None
-        consecutive_loss_count = 0
-        if r > 1:
-            prev_result = match_state.round_results[-1]
-            if not prev_result.is_draw:
-                recipient_id = prev_result.loser_id
-                if recipient_id is not None:
-                    consecutive_loss_count = match_state.players[recipient_id].consecutive_loss_count
-        if recipient_id is not None:
-            self.apply_reserved_aces(recipient_id, consecutive_loss_count)
+        # Find the longest prefix of trick history cached for this viewer in this round
+        cached_tracker = None
+        matched_prefix_len = 0
 
-        # Trace tricks history chronologically
-        for t_idx, t in enumerate(round_state.trick_history):
+        for prefix_len in range(len(round_state.trick_history), -1, -1):
+            prefix_plays = []
+            for t in round_state.trick_history[:prefix_len]:
+                prefix_plays.append((
+                    t.trick_number,
+                    tuple((play.player_id, play.card) for play in t.plays),
+                    t.outcome,
+                    t.collector_id
+                ))
+            prefix_tuple = tuple(prefix_plays)
+
+            key = (num_players, match_seed, viewer_id, round_state.round_number, prefix_tuple)
+            if key in cache:
+                cached_tracker = cache[key]
+                matched_prefix_len = prefix_len
+                break
+
+        if cached_tracker is not None:
+            # Load cached snapshot
+            self.card_locations = list(cached_tracker.card_locations)
+            self.is_void = [list(v) for v in cached_tracker.is_void]
+            self.player_known_cards = [set(k) for k in cached_tracker.player_known_cards]
+            self.discards = [set(d) for d in cached_tracker.discards]
+        else:
+            # Reconstruct starting state
+            self.card_locations = ["unknown"] * 52
+            self.is_void = [[False] * 4 for _ in range(num_players)]
+            self.player_known_cards = [set() for _ in range(num_players)]
+            self.discards = [set() for _ in range(4)]
+
+            self.record_own_hand(viewer_id, round_state.players[viewer_id].hand)
+
+            # Reserved aces assignment at round start
+            r = round_state.round_number
+            recipient_id = None
+            consecutive_loss_count = 0
+            if r > 1:
+                prev_result = match_state.round_results[-1]
+                if not prev_result.is_draw:
+                    recipient_id = prev_result.loser_id
+                    if recipient_id is not None:
+                        consecutive_loss_count = match_state.players[recipient_id].consecutive_loss_count
+            if recipient_id is not None:
+                self.apply_reserved_aces(recipient_id, consecutive_loss_count)
+
+            # Cache starting state
+            start_key = (num_players, match_seed, viewer_id, round_state.round_number, ())
+            cache[start_key] = self.clone()
+
+        # Trace tricks from matched prefix to current trick
+        for t_idx in range(matched_prefix_len, len(round_state.trick_history)):
+            t = round_state.trick_history[t_idx]
             played_players = {play.player_id for play in t.plays}
-            
-            # Detect steals
+
+            # Detect steals using dynamic activity checks
             for p in range(num_players):
-                if self.active_players_state[p] and not self.is_player_active_after_trick(p, t_idx, round_state):
+                was_active_before = self.is_player_active_after_trick(p, t_idx - 1, round_state) if t_idx > 0 else True
+                is_active_after = self.is_player_active_after_trick(p, t_idx, round_state)
+
+                if was_active_before and not is_active_after:
                     if p not in played_players:
-                        # Steal occurred! Stealer is lead player of trick T
                         stealer = t.plays[0].player_id if t.plays else t.lead_player_id
                         stolen_cards = list(self.player_known_cards[p])
                         for card in stolen_cards:
@@ -99,8 +163,6 @@ class CardTracker:
                         for s in range(4):
                             self.is_void[stealer][s] = self.is_void[p][s]
                             self.is_void[p][s] = True
-                
-                self.active_players_state[p] = self.is_player_active_after_trick(p, t_idx, round_state)
 
             # Process trick plays
             if t.plays:
@@ -124,7 +186,20 @@ class CardTracker:
                             self.player_known_cards[collector].add(play.card)
                             self.is_void[collector][get_suit(play.card)] = False
 
-        # Process current trick steals and plays
+            # Cache the completed trick state
+            prefix_plays = []
+            for t_prev in round_state.trick_history[:t_idx + 1]:
+                prefix_plays.append((
+                    t_prev.trick_number,
+                    tuple((play.player_id, play.card) for play in t_prev.plays),
+                    t_prev.outcome,
+                    t_prev.collector_id
+                ))
+            prefix_tuple = tuple(prefix_plays)
+            key = (num_players, match_seed, viewer_id, round_state.round_number, prefix_tuple)
+            cache[key] = self.clone()
+
+        # Process current trick steals and plays (not cached since in progress)
         curr_t = round_state.current_trick
         if curr_t is not None:
             for steal in curr_t.steals:
@@ -148,6 +223,12 @@ class CardTracker:
 
         # Re-apply viewer hand locations at the end to ensure they are marked "self", not "played"
         self.record_own_hand(viewer_id, round_state.players[viewer_id].hand)
+
+        # Evict cache entries if cache size grows too large (prevent memory leak)
+        if len(cache) > 1000:
+            keys = list(cache.keys())
+            for k in keys[:200]:
+                cache.pop(k, None)
 
     def get_suit_counts(self, viewer_id: int) -> Tuple[List[int], List[int], List[int], List[int]]:
         """Compute C_own, C_discard, C_known, and U for all suits."""
@@ -184,7 +265,7 @@ class ProbabilityEstimator:
             return 1.0
         
         c_own, c_discard, c_known, u_suit = self.tracker.get_suit_counts(player_id)
-        u_s = u_suit[suit]
+        u_s = max(0, u_suit[suit])
         if u_s == 0:
             return 1.0
 
@@ -199,7 +280,8 @@ class ProbabilityEstimator:
             return 1.0
 
         p_not_target = 1.0 - (h_unknown_target / t_unknown)
-        return max(0.0, p_not_target) ** u_s
+        p_not_target = max(0.0, min(1.0, p_not_target))
+        return p_not_target ** u_s
 
     def interruption_probability(self, suit: int, subsequent_players: List[int], round_state) -> float:
         """Calculate the probability that at least one subsequent player breaks suit."""
