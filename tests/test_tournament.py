@@ -7,7 +7,7 @@ and correct format exports of summary and detailed records to CSV files.
 
 import os
 import shutil
-from engine.agent import RandomAgent
+from agents.random.agent import RandomAgent
 from engine.tournament import TournamentConfig, TournamentRunner
 
 

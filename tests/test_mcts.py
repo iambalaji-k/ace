@@ -5,8 +5,8 @@ import pytest
 import random
 from engine.rules import AceEngine
 from engine.types import PlayCardAction, RoundStarting, StealAction, DeclineStealAction
-from engine.heuristic_agent import CardTracker
-from engine.mcts_agent import MCTSAgent, project_determinization
+from agents.heuristic.v1.heuristic_agent import CardTracker
+from agents.mcts.v1.mcts_agent import MCTSAgent, project_determinization
 from engine.card import get_suit
 
 def test_project_determinization_constraints() -> None:

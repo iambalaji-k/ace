@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from engine.rules import AceEngine, Success
 from engine.types import RoundStarting, EngineState
-from engine.agent import BaseAgent
+from agents.random.agent import BaseAgent
 from engine.events import get_player_view
 
 

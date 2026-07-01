@@ -8,10 +8,10 @@ import torch
 import os
 from engine.rules import AceEngine
 from engine.types import PlayCardAction, Action
-from engine.encoder_v2 import encode_state_v2
-from engine.model_v2 import AceNetV2
-from engine.rl_agent_v2 import RLAgentV2
-from engine.mcts_agent import MCTSAgent
+from agents.rl.v2.encoder_v2 import encode_state_v2
+from agents.rl.v2.model_v2 import AceNetV2
+from agents.rl.v2.rl_agent_v2 import RLAgentV2
+from agents.mcts.v1.mcts_agent import MCTSAgent
 from engine.action_encoding import action_to_index
 
 

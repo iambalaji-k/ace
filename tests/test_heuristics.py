@@ -4,7 +4,7 @@
 import pytest  # pyright: ignore[reportMissingImports]
 from engine.types import Action, DeclineStealAction, StealAction, PlayCardAction
 from engine.rules import AceEngine
-from engine.heuristic_agent import CardTracker, HeuristicAgent
+from agents.heuristic.v1.heuristic_agent import CardTracker, HeuristicAgent
 
 
 def test_card_tracker_initialization() -> None:
@@ -51,7 +51,7 @@ def test_heuristic_agent_tie_breaking() -> None:
 
 
 def test_heuristic_agent_v2_creation() -> None:
-    from engine.heuristic_agent_v2 import HeuristicAgentV2
+    from agents.heuristic.v2.heuristic_agent_v2 import HeuristicAgentV2
     agent = HeuristicAgentV2(player_id=1, seed=123)
     assert agent.player_id == 1
     assert "H102" in agent.weights

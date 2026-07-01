@@ -6,7 +6,7 @@ This document details the plan to verify and complete the **Random AI Agent** (P
 
 ## 1. Conformance & Interface Check
 
-We will review `engine/agent.py` to ensure it complies with Phase 7 requirements:
+We will review `agents/random/agent.py` to ensure it complies with Phase 7 requirements:
 - **Encapsulation**: The agent MUST NOT receive the raw `EngineState`. It receives the projected `player_view` where opponent cards are masked as `-1` and the discard history is cleared.
 - **Move Safety**: The agent selects an action uniformly from `legal_actions`.
 

@@ -4,7 +4,7 @@ This document outlines the design and implementation strategy for the **Tourname
 
 ---
 
-## 1. Abstract Agent Interface (`engine/agent.py`)
+## 1. Abstract Agent Interface (`agents/random/agent.py`)
 
 To allow different AI agents to participate in a tournament, we must define the standard base interface class:
 
@@ -18,7 +18,7 @@ class BaseAgent:
         raise NotImplementedError
 ```
 
-*Note: For testing the runner prior to implementing Phase 7 (AI Agents), we will write a temporary `RandomAgent` baseline in `engine/agent.py` that selects randomly from `legal_actions`.*
+*Note: For testing the runner prior to implementing Phase 7 (AI Agents), we will write a temporary `RandomAgent` baseline in `agents/random/agent.py` that selects randomly from `legal_actions`.*
 
 ---
 

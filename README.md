@@ -30,51 +30,42 @@ The Ace game is a trick-taking card game played with a standard 52-card deck (Sp
 ## 📁 Repository Directory Structure
 
 ```text
-ace-engine/
-├── docs/                             # Developer documentation and guides
+ace/
+├── docs/                             # Developer documentation, guides, and specifications
 │   ├── ARCHITECTURE.md               # Normative architecture definitions
-│   ├── Developer_Guide.md            # Quick-start dev onboarding guide
-│   ├── phase_2_plan.md               # Compliance catalog implementation plan
+│   ├── AETS_Project_Bootstrap.md     # Original bootstrap plan
+│   ├── Ace_Heuristic_Catalogue_v1.0.md # Detailed rule-based logic catalogs
+│   ├── example_game_walkthrough.md    # Multi-round narrated match walkthrough
 │   └── status.md                     # Active project status registry
-├── spec/                             # Frozen normative specification chapters
-│   ├── compliance_schema.json        # JSON Schema for compliance tests
-│   ├── compliance_test_catalog.md    # Normalized catalog list (TEST-0001 to TEST-0010)
-│   ├── chapter_01_foundations.md     # Chapter 1: Cards & PRNG
-│   ├── chapter_02_data_model.md      # Chapter 2: State objects representation
-│   ├── chapter_03_match_lifecycle.md # Chapter 3: Match configuration and seating
-│   ├── chapter_04_round_lifecycle.md # Chapter 4: Deal, reserved cards, rotations
-│   ├── chapter_05_rules_engine.md    # Chapter 5: Legal action validation
-│   ├── chapter_06_state_machine.md   # Chapter 6: Engine state transitions
-│   ├── chapter_07_event_system.md    # Chapter 7: Projection of public/private events
-│   ├── chapter_08_validation.md      # Chapter 8: Invariants checks (INV-001 to INV-012)
-│   ├── chapter_09_replay.md          # Chapter 9: Replay log specs
-│   ├── chapter_10_ai_interface.md    # Chapter 10: Player views and actions
-│   └── chapter_11_compliance.md      # Chapter 11: Compliance criteria
-├── engine/                           # Core Game Engine codebase
-│   ├── card.py                       # Card representations, suit/rank helpers, string mapping
-│   ├── prng.py                       # PCG-64/32 PRNG and Fisher-Yates card shuffler
-│   ├── deck.py                       # Reserved ace allocation and deal skip rotations
-│   ├── types.py                      # Immutable state models, action classes, game events
-│   ├── invariants.py                 # Enforcer checking INV-001 to INV-012 invariants
+├── spec/                             # Frozen normative specification chapters (Compliance specs)
+├── engine/                           # Core Game Engine codebase (Rules only, no AI brain code)
 │   ├── rules.py                      # Engine transition state machine and validation
+│   ├── types.py                      # Immutable state models, action classes, game events
+│   ├── card.py                       # Card representations, suit/rank helpers
+│   ├── deck.py                       # Reserved ace allocation and deal skip rotations
 │   ├── events.py                     # Public, private, and observer event projections
-│   ├── replay.py                     # JSON serialization schemas and file utilities
-│   ├── replay_player.py              # Playback player (step, undo, jump, branching fork)
-│   ├── agent.py                      # BaseAgent interface and RandomAgent baseline
-│   └── tournament.py                 # ThreadPoolExecutor multi-threaded tournament runner
-├── tests/                            # Automated Testing suites
-│   ├── compliance/                   # Conformance JSON test files
-│   │   ├── TEST-0001.json            # PRNG output validation vectors
-│   │   └── TEST-0005.json            # Decline steal state verification
-│   ├── test_compliance_harness.py    # Automated test runner loading compliance JSONs
-│   ├── test_foundations.py           # Unit tests checking cards, shuffles, PRNG
-│   ├── test_rules.py                 # Integration tests for match simulations
-│   ├── test_walkthrough_compliance.py# Validation of the 2-round narrated match walkthrough
-│   ├── test_replays.py               # Replay player fidelity, undo, and branching tests
-│   └── test_tournament.py            # ThreadPoolExecutor thread-safety and determinism tests
-├── scripts/                          # Developer execution scripts
-│   ├── run_manual_demo.py            # Interactive CLI tool for testing rules manually
-│   └── run_bot_match.py              # Progression viewer for automated bot matches
+│   ├── invariants.py                 # Enforcer checking INV-001 to INV-012 invariants
+│   ├── tournament.py                 # Multi-threaded tournament match runner
+│   ├── replay.py                     # Replay log saving/loading schemas
+│   ├── replay_player.py              # Interactive playback player (step, undo, branch fork)
+│   └── prng.py                       # PCG-XSH-RR-64/32 Pseudo-Random Number Generator
+├── agents/                           # Decision-making agents separated by type and version
+│   ├── random/                       # Fallback agents (BaseAgent and RandomAgent)
+│   ├── heuristic/                    # Rule-based bots
+│   │   ├── v1/                       # Legacy hardcoded rules (heuristic_agent.py + CardTracker)
+│   │   └── v2/                       # Parameterized rules (heuristic_agent_v2.py + evolved JSONs)
+│   ├── mcts/                         # Search-based bots
+│   │   └── v1/                       # Information Set MCTS (mcts_agent.py)
+│   └── rl/                           # Neural network bots
+│       ├── v1/                       # Legacy 4-player PPO model (encoder/model/rl_agent.py)
+│       └── v2/                       # Variable player count model (encoder_v2/model_v2/rl_agent_v2.py)
+├── checkpoints/                      # Unified directory for saved model weights and resume states
+│   ├── rl_champion.pt                # Version 1.0 Champion weights
+│   ├── rl_champion_v2.pt             # Version 2.0 Imitation-Learning Baseline weights
+│   ├── rl_champion_v3.pt             # Version 3.0 Gated Champion weights (created during self-play)
+│   └── train_resume_v3.pt            # Epoch-by-epoch training recovery files
+├── tests/                            # Automated testing suite
+├── logs/                             # Target output directory for logs and standard outputs
 ├── replays/                          # Target folder for saving JSON replay logs
 └── benchmarks/                       # Target folder for tournament CSV exports
 ```
@@ -97,25 +88,32 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # Install dependencies (pytest, ruff, basedpyright)
-pip install pytest ruff basedpyright
+pip install pytest ruff basedpyright torch numpy
 ```
 
 ### 2. Running Automated Tests
-Run the entire suite of 21 tests (including unit, integration, replay, and tournament tests):
+Run the entire suite of 38 tests (including unit, integration, replay, and tournament tests):
 
 ```bash
-python -m pytest
+# Set PYTHONPATH to root on CMD (Windows)
+set PYTHONPATH=. && venv\Scripts\pytest
+
+# Set PYTHONPATH on PowerShell
+$env:PYTHONPATH="." ; venv/Scripts/pytest
+
+# Set PYTHONPATH on Linux/macOS
+PYTHONPATH=. pytest
 ```
 
 ### 3. Running Code Quality Linters & Typecheckers
-Ensure your code changes remain fully type-safe and comply with repository formatting rules:
+Ensure code modifications comply with repository formatting and type safety:
 
 ```bash
-# Run Ruff code analysis
-python -m ruff check engine/ tests/ scripts/
+# Run Ruff lint check
+python -m ruff check engine/ tests/ scripts/ agents/
 
 # Run Basedpyright static typechecker
-python -m basedpyright engine/ tests/ scripts/
+python -m basedpyright engine/ tests/ scripts/ agents/
 ```
 
 ---
@@ -126,78 +124,30 @@ python -m basedpyright engine/ tests/ scripts/
 Watch 4 random agents play an automated game step-by-step with a custom turn delay. You will see hands dealt, steal attempts, card plays, suit breaks, and a final rankings scoreboard:
 
 ```bash
-python -m scripts.run_bot_match --players 4 --rounds 2 --seed 42 --delay 0.3
+python scripts/utils/run_bot_match.py --players 4 --rounds 2 --seed 42 --delay 0.3
 ```
 
 ### B. Manually Rig & Simulate a Match (`run_manual_demo.py`)
 Run an interactive CLI simulation where you can set custom card hands for specific players and test rules (like forcing a suit break) step-by-step:
 
 ```bash
-python -m scripts.run_manual_demo
-```
-
----
-
-## 📊 Replay Player & Tournament Runner APIs
-
-### 1. Replay System Playback (`engine/replay_player.py`)
-Record, load, step, or undo actions. You can also fork history to perform branching "what-if" analyses:
-
-```python
-from engine.replay import import_replay
-from engine.replay_player import ReplayPlayer
-from engine.types import PlayCardAction
-
-# Import log
-replay = import_replay("replays/match_123.json")
-player = ReplayPlayer(replay)
-
-# Traversal
-player.step()      # Step 1 action forward
-player.undo()      # Step 1 action backward (O(1) cached)
-player.jump_to(10) # Jump straight to action index 10
-
-# Branching / Forking analysis at action index 5
-new_replay = player.fork_at(5, PlayCardAction(player_id=0, card=0))
-```
-
-### 2. Multi-Threaded Tournament Benchmarking (`engine/tournament.py`)
-Run thousands of matches in parallel threads using `ThreadPoolExecutor`. The runner compiles points mean, standard deviation, 95% confidence intervals, win ratios, and exports results to CSV:
-
-```python
-from engine.tournament import TournamentConfig, TournamentRunner
-from engine.agent import RandomAgent
-
-# Config a 1,000-match tournament
-config = TournamentConfig(
-    num_matches=1000,
-    num_players=4,
-    num_rounds=3,
-    base_seed=10000,
-    agent_classes=[RandomAgent, RandomAgent, RandomAgent, RandomAgent]
-)
-
-runner = TournamentRunner(config)
-results = runner.run()
-
-# Export statistics to CSV files
-runner.export_to_csv(results, "benchmarks/")
+python scripts/utils/run_manual_demo.py
 ```
 
 ---
 
 ## 🤖 AI Agents (Heuristics, MCTS, and Self-Learning)
 
-The Ace Engine features three distinct tiers of artificial intelligence, transitioning from structured rule-based systems to deep self-play reinforcement learning:
+The Ace Engine features four distinct tiers of artificial intelligence, transitioning from structured rule-based systems to deep self-play reinforcement learning:
 
 ### 1. Evolved Heuristic Agent (`HeuristicAgentV2`)
 * **Core Logic**: An expert-rule system containing **55 distinct card-play and steal heuristics** categorized by match phase (Opening, Middle, Endgame) and hand configurations.
 * **Optimization (Genetic Algorithm)**: Co-evolves both the 55 heuristic weights and **11 strategic parameter thresholds** (e.g. opponent void risk limits, suit-hoarding boundaries) to maximize match placement outcomes.
 * **Training Command**:
   ```bash
-  python scripts/train_genetic_weights.py
+  python scripts/training/train_genetic_weights.py
   ```
-  *(Optimizes weights and outputs updated parameters to `engine/heuristic_v2_weights.json`)*.
+  *(Optimizes weights and outputs updated parameters to `agents/heuristic/v2/heuristic_v2_weights.json`)*.
 
 ### 2. Monte Carlo Tree Search Agent (`MCTSAgent`)
 * **Core Logic**: Implements **Information Set MCTS (ISMCTS)** to play under imperfect information.
@@ -205,51 +155,49 @@ The Ace Engine features three distinct tiers of artificial intelligence, transit
 * **Heuristic-Guided Rollouts**: Utilizes our evolved `HeuristicAgentV2` to make playout choices, producing high-fidelity rollouts and extremely fast search convergence on CPU.
 * **Evaluation Command**:
   ```bash
-  python scripts/evaluate_mcts_agent.py
+  python scripts/evaluation/evaluate_mcts_agent.py
   ```
 
-### 3. Self-Learning RL Agent (`RLAgent`)
-* **Core Logic**: A pure reinforcement learning agent trained entirely from scratch with **zero human bias**.
-* **Model**: A lightweight dual Actor-Critic network (`AceNet` in PyTorch) running state vectorization (343 input features) and legal action masking.
-* **Training Method**: REINFORCE Policy Gradient with Advantage baseline, highly optimized to complete thousands of training matches on a standard **CPU** in under 5 minutes.
-* **Training & Evaluation Commands**:
+### 3. Self-Learning RL Agents
+The repository supports three iterations of Reinforcement Learning:
+* **RL Agent 1.0 (Legacy)**: Flat 343-feature state representation. Hardcoded strictly to 4-player matches. Trained using REINFORCE. (*Weights: `checkpoints/rl_champion.pt`*)
+* **RL Agent 2.0 (Behavior Cloning)**: Dynamic 459-feature state representation supporting variable player counts (3–6 players). Bootstrapped via behavior cloning from MCTS and Heuristic V2. (*Weights: `checkpoints/rl_champion_v2.pt`*)
+* **RL Agent 3.0 (SPRS v3 Self-Play)**: Advanced PPO pipeline featuring **State-Potential Reward System (SPRS v3)**. It replaces event-based rewards with distance-preserving hand potentials and knowledge ratio metrics to eliminate reward hacking.
+* **RL v3.0 Training Command**:
   ```bash
-  # Train the agent (saves weights to engine/rl_champion.pt)
-  python scripts/train_self_play.py
-
-  # Benchmark RL Agent against Heuristic V2
-  python scripts/evaluate_rl_agent.py
+  # Train the RL v3.0 agent (resumes automatically from checkpoints/train_resume_v3.pt)
+  python scripts/training/train_self_play_v3.py
   ```
 
 ---
 
 ## 🎮 Play Against the Agents (CLI Interface)
 
-You can play interactive card matches directly against these agents in your terminal:
+You can play interactive card matches directly against these agents in your terminal. You can choose the agent (Heuristic V1/V2, MCTS, RL V1/V2), set the number of matches/rounds, and customize your seat position:
 
-* **Play against Heuristic bots**:
-  ```bash
-  python scripts/play_against_heuristic.py
-  ```
-* **Play against the trained RL Champion bots**:
-  ```bash
-  python scripts/play_against_rl.py
-  ```
+```bash
+# Start the interactive CLI play suite
+python scripts/play/play_interactive.py
+```
+
+---
+
+## 📊 Universal Benchmark Tournament
+Evaluate the playing strength of all agents (RL Agent V2, Heuristic V1, Heuristic V2, RL Agent V1, MCTS Agent) in a unified, seat-balanced tournament of 100 matches:
+
+```bash
+python scripts/evaluation/benchmark_all_agents.py
+```
 
 ---
 
 ## 🗺️ Project Roadmap & Status
 
-- [x] **Phase 0**: Repository Setup & Core Infrastructure Documents
-- [x] **Phase 1**: Chapter 1–11 Protocol Specification drafting
-- [x] **Phase 2**: Compliance Test Catalog & Automated loader
-- [x] **Phase 3**: Immutable State Machine Data Models
-- [x] **Phase 4**: Rules Engine & Headless Simulator logic
-- [x] **Phase 5**: Appendix/Replay Player (Undo, Redo, Branching)
-- [x] **Phase 6**: Tournament runner & Statistical CSV exporter
-- [x] **Phase 7**: Random AI Agent baseline integration
-- [x] **Phase 8**: **Heuristic AI Agent** (Rule-based weights co-evolved via Genetic Algorithm)
-- [x] **Phase 9**: **Monte Carlo AI Agent** (Imperfect Information MCTS with guided rollouts)
-- [ ] **Phase 10**: **Neural AI Agent** (Deep learning observation tensors)
-- [x] **Phase 11**: **Reinforcement Learning Pipeline** (Model-free self-play REINFORCE on CPU)
-- [ ] **Phase 12**: **Optimization & Benchmarking** (1,000,000 game runs hot-path profiling)
+- [x] **Phase 0–7**: Core Rules Engine, state-machine transitions, event projection, and compliance tests.
+- [x] **Phase 8**: **Heuristic AI Agent** (Rule-based weights co-evolved via Genetic Algorithm).
+- [x] **Phase 9**: **Monte Carlo AI Agent** (Imperfect Information MCTS with guided rollouts).
+- [x] **Phase 10**: **Neural AI Agent** (Imitation Learning Behavior Cloning baseline).
+- [x] **Phase 11**: **Reinforcement Learning Self-Play** (PPO self-play pipeline on CPU).
+- [x] **Phase 12**: **SPRS v3 Reward Redesign** (Fully integrated State-Potential Reward System to solve reward-hacking and stabilize convergence).
+- [x] **Phase 13**: **Repository Reorganization** (Decoupled agents by type and version, separated weights into `checkpoints/`, and moved docs to `docs/`).
+- [ ] **Phase 14**: **Long-running training runs** (Train RL Agent 3.0 for 500+ epochs under SPRS v3 to surpass human heuristic and MCTS baselines).

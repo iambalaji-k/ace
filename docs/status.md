@@ -43,12 +43,12 @@
 | [engine/replay_player.py](file:///D:/Vibe Coding/ace/engine/replay_player.py) | Playback controls, history logs, undos/redos, forks | ~120 |
 | [tests/test_replays.py](file:///D:/Vibe Coding/ace/tests/test_replays.py) | Verification checks for serialization determinism, jumps, branching | ~160 |
 | [tests/test_walkthrough_compliance.py](file:///D:/Vibe Coding/ace/tests/test_walkthrough_compliance.py) | Game walkthrough transitions validation suite | ~240 |
-| [engine/agent.py](file:///D:/Vibe Coding/ace/engine/agent.py) | Abstract base agent and RandomAgent baseline | ~40 |
+| [agents/random/agent.py](file:///D:/Vibe Coding/ace/agents/random/agent.py) | Abstract base agent and RandomAgent baseline | ~40 |
 | [engine/tournament.py](file:///D:/Vibe Coding/ace/engine/tournament.py) | ThreadPoolExecutor parallel match simulator runner | ~220 |
 | [tests/test_tournament.py](file:///D:/Vibe Coding/ace/tests/test_tournament.py) | Unit tests verifying parallel execution, determinism, and CSV formats | ~80 |
 | [scripts/run_bot_match.py](file:///D:/Vibe Coding/ace/scripts/run_bot_match.py) | Headless visualizer demo script | ~135 |
 | [tests/test_agents.py](file:///D:/Vibe Coding/ace/tests/test_agents.py) | Unit tests validating RandomAgent compliance and determinism | ~50 |
-| [engine/heuristic_agent.py](file:///D:/Vibe Coding/ace/engine/heuristic_agent.py) | CardTracker void/known estimator, HeuristicAgent registry, scoring | ~1130 |
+| [agents/heuristic/v1/heuristic_agent.py](file:///D:/Vibe Coding/ace/agents/heuristic/v1/heuristic_agent.py) | CardTracker void/known estimator, HeuristicAgent registry, scoring | ~1130 |
 | [tests/test_heuristics.py](file:///D:/Vibe Coding/ace/tests/test_heuristics.py) | Unit tests for HeuristicAgent, CardTracker, and tie-breakers | ~50 |
 | [scripts/run_heuristic_tournament.py](file:///D:/Vibe Coding/ace/scripts/run_heuristic_tournament.py) | 1,000 round Heuristic vs. Random benchmark script | ~75 |
 

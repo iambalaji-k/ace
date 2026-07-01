@@ -28,7 +28,7 @@ This document details the stage-by-stage execution plan to implement the archite
      * `build_player_observation(state: EngineState, player_id: int) -> PlayerObservation`.
      * `EncodedObservation` (float vector + action mask tuple).
      * `encode_observation(obs: PlayerObservation) -> EncodedObservation`.
-  2. Create `engine/action_encoding.py` (or add to `engine/agent.py`) implementing:
+  2. Create `engine/action_encoding.py` (or add to `agents/random/agent.py`) implementing:
      * Action mapping logic:
        * `0` $\rightarrow$ `DeclineSteal`
        * `1` $\rightarrow$ `Steal`

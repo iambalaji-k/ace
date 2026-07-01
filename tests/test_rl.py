@@ -6,9 +6,9 @@ import numpy as np
 import torch
 from engine.rules import AceEngine
 from engine.types import PlayCardAction, RoundStarting
-from engine.encoder import encode_state
-from engine.model import AceNet
-from engine.rl_agent import RLAgent, action_to_idx
+from agents.rl.v1.encoder import encode_state
+from agents.rl.v1.model import AceNet
+from agents.rl.v1.rl_agent import RLAgent, action_to_idx
 
 def test_state_encoder_dimensions() -> None:
     """Verifies that the state encoder output has correct shape and types."""

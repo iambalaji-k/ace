@@ -7,7 +7,7 @@ observation creation, and flat vector state encoding.
 
 from typing import Sequence
 import pytest  # pyright: ignore[reportMissingImports]
-from engine.agent import RandomAgent
+from agents.random.agent import RandomAgent
 from engine.types import Action, DeclineStealAction, StealAction, PlayCardAction
 from engine.rules import AceEngine, Success
 from engine.observation import build_player_observation, encode_observation
